@@ -90,3 +90,20 @@ docs: document fresh install test harness usage
 ```
 
 Breaking changes: add `!` after the type (e.g., `feat!: rename config namespace`).
+
+## PLNech fork conventions
+
+- **TODO.md is the demand tracker.** The moment the owner asks for anything —
+  bug, feature, question, "we should" — it lands in `TODO.md` as a checkbox the
+  same turn. Aim for inbox zero: close items (tick + one-line learning) as soon
+  as they ship; move stale ones to Parked instead of letting them rot. Working
+  sessions start by reading TODO.md, not by re-deriving state.
+- This fork runs **offline and local**: systemd user unit, loopback-only,
+  `AGENTS_OBSERVE_OFFLINE=1`. Server-side facts (runbook, gotchas, layout of
+  the sidecar layer) live in `~/Work/Perso/SRE/runbooks/agents-observe.md`.
+- Observability DB discipline: query `observe.db` counts only, never `payload`
+  values. Our derived layer is `stats.db` (numbers + FTS corpus + turn labels) —
+  rebuildable with `--all` except turn labels.
+- Label provenance: `turn_labels` keys on (turn, axis, **model**); the model id
+  recorded is what the serving API reports, plus endpoint lane. Never overwrite
+  another model's labels.
