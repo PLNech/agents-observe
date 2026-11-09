@@ -4,6 +4,48 @@ Rule: **every owner demand lands here the moment it's asked** — bug, feature,
 question, "we should". Tick with a one-line learning when shipped; move stale
 items to Parked rather than letting them rot. Aim: inbox zero.
 
+## Now (added 2026-11-09 — owner session round 2)
+
+- [x] **WS origin fix (Disconnected footer):** shipped 2026-11-09 (08bad35) —
+  `*.localhost` hostnames count as loopback (RFC 6761); WS handshake via
+  `agents.localhost` verified live (101, connection held). Learning: the
+  origin check string-matched `localhost`, so ANY devname-style name broke
+  the websocket while HTTP kept working.
+- [x] **Constellation UX:** shipped 2026-11-09 (6b603d1, 4c0-ready) — scroll
+  wheel zooms the camera around the pointer (reuses the viewH zoom scale,
+  clamped to the slider's 380–3200 range; native non-passive listener, paused
+  while a drill-in owns the camera); stars tinted by dominant tool category
+  from /sessions/facets with a bottom-right legend (no facet row → classic
+  heat ramp). Learning: React's onWheel is passive — wheel-zoom needs a native
+  `{passive:false}` listener to block page scroll.
+- [ ] **Live thinking in the UI:** thinking IS captured (transcript-parser reads
+  it; corpus holds 12.6k thinking turns) but it's not streamed into the
+  dashboard. Wire thinking into the event stream / drill-in ("see thinking as
+  it comes") — ties into the parked UI-pass-2 "thinking bubbles" item.
+- [ ] **Leboard integration:** fuzzy-match agents-observe projects to leboard
+  projects (leboard.localhost:8377). Suggested match per project, owner
+  confirms; store the mapping so sessions roll up under the right leboard
+  project.
+
+## Now (added 2026-11-09 — owner: "maxout what we can show today")
+
+- [ ] **Deterministic facet layer (runtime).** `GET /sessions/facets`: per-session
+  tool-category mix (payload.tool_name → category map, pure SQL, no schema change),
+  error/permission counts, harness/agent-classes, duration. Facet bar on the
+  sessions-list theme: filter by category, harness, project, status, has-errors.
+- [x] **NLP batch lane.** Shipped 2026-11-09 — `bin/agents-observe-nlp` (SRE,
+  uv venv, spaCy sm + bge-m3 via ollama + sklearn): tags → observe.db
+  `session_tags` (39 sessions, 414 tags), embeddings → stats.db (strategy c =
+  slug+first-3-prompts won purity+silhouette, honest n=39 caveat), clusters
+  k_best=4 → stats.db + observe.db serving mirror. Tags+cluster pills live in
+  the facet bar (34cef61, ab0f005, 852f29a). Learning: the pre-slim backup DB
+  never migrated to the Mac, so validation ran at n=39 — re-validate purity
+  as sessions accumulate.
+- [ ] **Runtime-vs-batch doctrine** (decided 2026-11-09): tool categories, error
+  counts, durations, harness splits = query-time SQL (28k events, ms). spaCy,
+  embeddings, clustering = batch (model load + full-corpus passes). Materialize
+  rollups only when events > ~1M.
+
 ## Now (approved 2026-10-14)
 
 - [ ] **Judge-validation harness + first round.** enablers-lane LLM grades ~50
