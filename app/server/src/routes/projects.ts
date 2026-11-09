@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import type { EventStore } from '../storage/types'
 import type { Project } from '../types'
 import { apiError } from '../errors'
+import { leboardClient } from '../services/leboard'
+import { suggestLeboardMatches } from '../services/leboard-match'
 
 type Env = {
   Variables: {
@@ -20,6 +22,8 @@ router.get('/projects', async (c) => {
     id: r.id,
     slug: r.slug,
     name: r.name,
+    leboardProjectId: r.leboard_project_id ?? null,
+    leboardProjectName: r.leboard_project_name ?? null,
     createdAt: r.created_at,
     sessionCount: r.session_count,
   }))
@@ -67,6 +71,32 @@ function slugify(s: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
 }
+
+// GET /projects/leboard-suggestions — fuzzy-match every project that has
+// no LeBoard link yet against the LeBoard project list. Degrades to
+// { available: false } when LeBoard is unreachable; never throws.
+router.get('/projects/leboard-suggestions', async (c) => {
+  const store = c.get('store')
+  const leboard = await leboardClient.listProjects()
+  if (!leboard.available) {
+    return c.json({ available: false, suggestions: [] })
+  }
+
+  const rows = await store.getProjects()
+  const suggestions = rows
+    .filter((r: any) => !r.leboard_project_id)
+    .map((r: any) => {
+      const matches = suggestLeboardMatches({ name: r.name, slug: r.slug }, leboard.projects)
+      return {
+        projectId: r.id,
+        projectName: r.name,
+        projectSlug: r.slug,
+        best: matches[0] ?? null,
+        runnerUp: matches[1] ?? null,
+      }
+    })
+  return c.json({ available: true, suggestions })
+})
 
 router.get('/projects/:id/sessions', async (c) => {
   const store = c.get('store')
@@ -116,6 +146,50 @@ router.patch('/projects/:id', async (c) => {
   } catch {
     return apiError(c, 400, 'Invalid request')
   }
+})
+
+// PATCH /projects/:id/leboard — set or clear the project's LeBoard link.
+// Body: { leboardProjectId: string | null, leboardProjectName: string | null }.
+// Both null clears the link; both non-null strings sets it (LeBoard
+// projects are name-keyed, so the id is the name). No other shapes accepted.
+router.patch('/projects/:id/leboard', async (c) => {
+  const store = c.get('store')
+  const broadcastToAll = c.get('broadcastToAll')
+  const projectId = Number(c.req.param('id'))
+  if (isNaN(projectId)) return apiError(c, 400, 'Invalid project ID')
+
+  let body: Record<string, unknown>
+  try {
+    body = (await c.req.json()) as Record<string, unknown>
+  } catch {
+    return apiError(c, 400, 'Invalid JSON body')
+  }
+
+  const id = body.leboardProjectId
+  const name = body.leboardProjectName
+  const hasId = typeof id === 'string' && id.trim().length > 0
+  const hasName = typeof name === 'string' && name.trim().length > 0
+  if (hasId !== hasName) {
+    return apiError(
+      c,
+      400,
+      'leboardProjectId and leboardProjectName must be set or cleared together',
+    )
+  }
+  const leboardProjectId = hasId ? (id as string).trim() : null
+  const leboardProjectName = hasName ? (name as string).trim() : null
+
+  const project = await store.getProjectById(projectId)
+  if (!project) return apiError(c, 404, 'Project not found')
+
+  await store.updateProjectLeboard(projectId, leboardProjectId, leboardProjectName)
+  // Existing project_update shape ({ id, name }) only triggers project
+  // query invalidation client-side, which is all the link change needs.
+  broadcastToAll({
+    type: 'project_update',
+    data: { id: projectId, name: project.name },
+  })
+  return c.json({ ok: true, leboardProjectId, leboardProjectName })
 })
 
 export default router

@@ -53,6 +53,10 @@ export interface Project {
   id: number
   slug: string
   name: string
+  /** LeBoard project this dashboard project is linked to (name-keyed), or null. */
+  leboardProjectId?: string | null
+  /** Name snapshot kept for display when LeBoard is unreachable. */
+  leboardProjectName?: string | null
   createdAt: number
   sessionCount?: number
 }

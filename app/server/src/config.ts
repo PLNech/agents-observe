@@ -86,6 +86,13 @@ export const config = {
   clientDistPath: process.env.AGENTS_OBSERVE_CLIENT_DIST_PATH || '',
   devClientPort: parseInt(process.env.AGENTS_OBSERVE_DEV_CLIENT_PORT || '5174', 10),
 
+  // LeBoard HTTP API base (project goal/task board, loopback-only, no
+  // auth). Used read-only by GET /projects/leboard-suggestions; when
+  // LeBoard is down the endpoint reports { available: false } instead
+  // of failing. The server must stay loopback-only, so calling the
+  // loopback LeBoard is fine.
+  leboardUrl: process.env.AGENTS_OBSERVE_LEBOARD_URL || 'http://127.0.0.1:8377',
+
   // DB reset policy: 'allow' = permit, 'deny' = reject, 'backup' (default) = backup then reset
   // Unrecognized values are treated as 'deny' to prevent misconfiguration
   allowDbReset:
