@@ -18,10 +18,13 @@ items to Parked rather than letting them rot. Aim: inbox zero.
   from /sessions/facets with a bottom-right legend (no facet row → classic
   heat ramp). Learning: React's onWheel is passive — wheel-zoom needs a native
   `{passive:false}` listener to block page scroll.
-- [ ] **Live thinking in the UI:** thinking IS captured (transcript-parser reads
-  it; corpus holds 12.6k thinking turns) but it's not streamed into the
-  dashboard. Wire thinking into the event stream / drill-in ("see thinking as
-  it comes") — ties into the parked UI-pass-2 "thinking bubbles" item.
+- [x] **Live thinking in the UI:** shipped 2026-11-09 — `ThinkingTailTracker`
+  tail-reads thinking blocks from the transcript JSONL by byte offset (never
+  a full re-parse), a 5s WS tick pushes new blocks to subscribed sessions
+  only, and a muted collapsible card above the event stream shows the latest
+  block + "earlier N". Learning: the obvious offset-after-last-newline
+  accounting double-reads a buffered partial line — the offset must advance
+  past bytes held in `pending` (offset = file size after each read).
 - [ ] **Leboard integration:** fuzzy-match agents-observe projects to leboard
   projects (leboard.localhost:8377). Suggested match per project, owner
   confirms; store the mapping so sessions roll up under the right leboard
