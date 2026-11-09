@@ -172,7 +172,12 @@ describe('GET /api/sessions/facets', () => {
   test('returns the store facets payload as-is', async () => {
     const facets = {
       sessions: {
-        sess1: { toolCategories: { shell: 3, edit: 1 }, toolFailures: 1, permissionDenied: 0, subagentEvents: 2 },
+        sess1: {
+          toolCategories: { shell: 3, edit: 1 },
+          toolFailures: 1,
+          permissionDenied: 0,
+          subagentEvents: 2,
+        },
       },
       categorySessionCounts: { shell: 1, edit: 1 },
     }

@@ -1008,15 +1008,59 @@ describe('SqliteAdapter — getSessionFacets', () => {
     await store.upsertSession('sess1', projId, null, null, 1000)
     await store.upsertAgent('a1', 'sess1', null, null, null)
 
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1000, payload: { tool_name: 'Bash' } })
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1001, payload: { tool_name: 'Bash' } })
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1002, payload: { tool_name: 'mcp__rea__analyze_function' } })
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1003, payload: { tool_name: 'SomeFutureTool' } })
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUseFailure', timestamp: 1004 })
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PermissionDenied', timestamp: 1005 })
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'SubagentStart', timestamp: 1006 })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PostToolUse',
+      timestamp: 1000,
+      payload: { tool_name: 'Bash' },
+    })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PostToolUse',
+      timestamp: 1001,
+      payload: { tool_name: 'Bash' },
+    })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PostToolUse',
+      timestamp: 1002,
+      payload: { tool_name: 'mcp__rea__analyze_function' },
+    })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PostToolUse',
+      timestamp: 1003,
+      payload: { tool_name: 'SomeFutureTool' },
+    })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PostToolUseFailure',
+      timestamp: 1004,
+    })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PermissionDenied',
+      timestamp: 1005,
+    })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'SubagentStart',
+      timestamp: 1006,
+    })
     // Not part of the facet scan:
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'UserPromptSubmit', timestamp: 1007 })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'UserPromptSubmit',
+      timestamp: 1007,
+    })
 
     const facets = await store.getSessionFacets()
     expect(facets.sessions['sess1']).toEqual({
@@ -1033,8 +1077,20 @@ describe('SqliteAdapter — getSessionFacets', () => {
     await store.upsertSession('sess1', projId, null, null, 1000)
     await store.upsertAgent('a1', 'sess1', null, null, null)
 
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PreToolUse', timestamp: 1000, payload: { tool_name: 'Edit' } })
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1001, payload: { tool_name: 'Edit' } })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PreToolUse',
+      timestamp: 1000,
+      payload: { tool_name: 'Edit' },
+    })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PostToolUse',
+      timestamp: 1001,
+      payload: { tool_name: 'Edit' },
+    })
 
     const facets = await store.getSessionFacets()
     expect(facets.sessions['sess1'].toolCategories).toEqual({ edit: 1 })
@@ -1044,7 +1100,12 @@ describe('SqliteAdapter — getSessionFacets', () => {
     const projId = await store.createProject('proj1', 'Project 1')
     await store.upsertSession('sess1', projId, null, null, 1000)
     await store.upsertAgent('a1', 'sess1', null, null, null)
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'UserPromptSubmit', timestamp: 1000 })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'UserPromptSubmit',
+      timestamp: 1000,
+    })
 
     const facets = await store.getSessionFacets()
     expect(facets.sessions).toEqual({})
@@ -1056,7 +1117,13 @@ describe('SqliteAdapter — getSessionFacets', () => {
     await store.upsertSession('sess1', projId, null, null, 1000)
     await store.upsertAgent('a1', 'sess1', null, null, null)
 
-    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1000, payload: {} })
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PostToolUse',
+      timestamp: 1000,
+      payload: {},
+    })
 
     const facets = await store.getSessionFacets()
     expect(facets.sessions['sess1'].toolCategories).toEqual({ other: 1 })
