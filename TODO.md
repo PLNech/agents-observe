@@ -25,10 +25,15 @@ items to Parked rather than letting them rot. Aim: inbox zero.
   block + "earlier N". Learning: the obvious offset-after-last-newline
   accounting double-reads a buffered partial line — the offset must advance
   past bytes held in `pending` (offset = file size after each read).
-- [ ] **Leboard integration:** fuzzy-match agents-observe projects to leboard
-  projects (leboard.localhost:8377). Suggested match per project, owner
-  confirms; store the mapping so sessions roll up under the right leboard
-  project.
+- [x] **Leboard integration:** shipped 2026-11-09 (ab5456a, 813de4e, 143dbb0,
+  16d3de2) — `GET /projects/leboard-suggestions` fuzzy-matches unlinked
+  projects against LeBoard's `GET /api/projects` (loopback, no auth; dice
+  coefficient on name/slug, confident ≥ 0.7), `PATCH /projects/:id/leboard`
+  stores the mapping, and the project modal has a LeBoard link section
+  (confirm / clear / searchable pick-from-list). Dry-run over the live DB:
+  11 of 23 projects get a confident suggestion. Learning: LeBoard has no
+  project ids — the name is the key, so the stored name snapshot keeps the
+  UI stable across LeBoard-side renames. Inert until the next server restart.
 
 ## Now (added 2026-11-09 — owner: "maxout what we can show today")
 
