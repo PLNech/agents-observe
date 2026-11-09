@@ -59,6 +59,17 @@ export interface EventStore {
   getProjectById(id: number): Promise<any | null>
   getProjectBySlug(slug: string): Promise<any | null>
   updateProjectName(projectId: number, name: string): Promise<void>
+  /**
+   * Set or clear the project's LeBoard link. Pass null for both to
+   * clear. LeBoard projects are keyed by name, hence the name snapshot:
+   * it keeps the UI stable if the LeBoard project is later renamed or
+   * deleted on the LeBoard side.
+   */
+  updateProjectLeboard(
+    projectId: number,
+    leboardProjectId: string | null,
+    leboardProjectName: string | null,
+  ): Promise<void>
   isSlugAvailable(slug: string): Promise<boolean>
   /**
    * Find-or-create a project by slug. Uses INSERT ... ON CONFLICT(slug)

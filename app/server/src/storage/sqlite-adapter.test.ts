@@ -174,6 +174,34 @@ describe('SqliteAdapter — projects', () => {
     expect(projects[0].name).toBe('Test Project')
   })
 
+  test('projects table has leboard columns, null by default', async () => {
+    await store.createProject('test-proj', 'Test Project')
+    const cols = (
+      (store as any).db.prepare("PRAGMA table_info('projects')").all() as Array<{
+        name: string
+      }>
+    ).map((c) => c.name)
+    expect(cols).toContain('leboard_project_id')
+    expect(cols).toContain('leboard_project_name')
+    const projects = await store.getProjects()
+    expect(projects[0].leboard_project_id).toBeNull()
+    expect(projects[0].leboard_project_name).toBeNull()
+  })
+
+  test('updateProjectLeboard sets and clears the link', async () => {
+    const projId = await store.createProject('test-proj', 'Test Project')
+
+    await store.updateProjectLeboard(projId, 'sre', 'SRE')
+    let projects = await store.getProjects()
+    expect(projects[0].leboard_project_id).toBe('sre')
+    expect(projects[0].leboard_project_name).toBe('SRE')
+
+    await store.updateProjectLeboard(projId, null, null)
+    projects = await store.getProjects()
+    expect(projects[0].leboard_project_id).toBeNull()
+    expect(projects[0].leboard_project_name).toBeNull()
+  })
+
   test('getRecentSessions includes project_slug and project_name', async () => {
     const projId = await store.createProject('proj1', 'Project One')
     await store.upsertSession('sess1', projId, null, null, 1000)

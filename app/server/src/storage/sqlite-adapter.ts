@@ -63,6 +63,14 @@ export class SqliteAdapter implements EventStore {
     const projectsHasCwd = projectCols.some((c) => c.name === 'cwd')
     const projectsHasTranscriptPath = projectCols.some((c) => c.name === 'transcript_path')
     if (projectsHasMetadata || projectsHasCwd || projectsHasTranscriptPath) {
+      // Carry the LeBoard columns through the rebuild when they already
+      // exist (an intermediate version's DB); the ALTER TABLE below
+      // re-adds them empty otherwise.
+      const hasLeboard = projectCols.some((c) => c.name === 'leboard_project_id')
+      const leboardCols = hasLeboard
+        ? `,\n          leboard_project_id TEXT,\n          leboard_project_name TEXT`
+        : ''
+      const leboardSelect = hasLeboard ? `, leboard_project_id, leboard_project_name` : ''
       this.db.exec(`
         PRAGMA foreign_keys=OFF;
         BEGIN IMMEDIATE;
@@ -72,15 +80,26 @@ export class SqliteAdapter implements EventStore {
           slug TEXT UNIQUE NOT NULL,
           name TEXT NOT NULL,
           created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL
+          updated_at INTEGER NOT NULL${leboardCols}
         );
-        INSERT INTO projects_new (id, slug, name, created_at, updated_at)
-        SELECT id, slug, name, created_at, updated_at FROM projects;
+        INSERT INTO projects_new (id, slug, name, created_at, updated_at${leboardSelect})
+        SELECT id, slug, name, created_at, updated_at${leboardSelect} FROM projects;
         DROP TABLE projects;
         ALTER TABLE projects_new RENAME TO projects;
         COMMIT;
         PRAGMA foreign_keys=ON;
       `)
+    }
+
+    // LeBoard link columns. Checked after the rebuild migration above so
+    // a table rebuilt from a legacy shape gets them too (same pattern as
+    // the sessions migrations: PRAGMA check + ALTER TABLE ADD COLUMN).
+    const projectColsAfterRebuild = this.db.prepare("PRAGMA table_info('projects')").all() as {
+      name: string
+    }[]
+    if (!projectColsAfterRebuild.some((c) => c.name === 'leboard_project_id')) {
+      this.db.exec('ALTER TABLE projects ADD COLUMN leboard_project_id TEXT')
+      this.db.exec('ALTER TABLE projects ADD COLUMN leboard_project_name TEXT')
     }
 
     this.db.exec(`
@@ -578,6 +597,18 @@ export class SqliteAdapter implements EventStore {
       .run(name, Date.now(), projectId)
   }
 
+  async updateProjectLeboard(
+    projectId: number,
+    leboardProjectId: string | null,
+    leboardProjectName: string | null,
+  ): Promise<void> {
+    this.db
+      .prepare(
+        'UPDATE projects SET leboard_project_id = ?, leboard_project_name = ?, updated_at = ? WHERE id = ?',
+      )
+      .run(leboardProjectId, leboardProjectName, Date.now(), projectId)
+  }
+
   async isSlugAvailable(slug: string): Promise<boolean> {
     const row = this.db.prepare(`SELECT id FROM projects WHERE slug = ?`).get(slug) as
       { id: number } | undefined
@@ -927,7 +958,7 @@ export class SqliteAdapter implements EventStore {
     return this.db
       .prepare(
         `
-      SELECT p.id, p.slug, p.name, p.created_at,
+      SELECT p.id, p.slug, p.name, p.leboard_project_id, p.leboard_project_name, p.created_at,
         COUNT(DISTINCT s.id) as session_count
       FROM projects p
       LEFT JOIN sessions s ON s.project_id = p.id
