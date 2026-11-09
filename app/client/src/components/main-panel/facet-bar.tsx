@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -38,10 +38,18 @@ const STATUS_LABELS: Record<string, string> = {
   ended: 'Ended',
 }
 
+// Tags are unbounded (the NLP layer derives them); the bar shows the most
+// common TAG_PILL_LIMIT and a "+N more" expander past that.
+const TAG_PILL_LIMIT = 12
+
 export interface FacetFilters {
   categories: string[]
   statuses: string[]
   agentClasses: string[]
+  /** Tag strings (cluster ids stay strings for pill symmetry). */
+  tags: string[]
+  /** Cluster ids as strings, e.g. '0'. */
+  clusters: string[]
 }
 
 /**
@@ -54,8 +62,14 @@ export function filterSessionsByFacets(
   facets: SessionFacets | null,
   filters: FacetFilters,
 ): RecentSession[] {
-  const { categories, statuses, agentClasses } = filters
-  if (categories.length === 0 && statuses.length === 0 && agentClasses.length === 0) {
+  const { categories, statuses, agentClasses, tags, clusters } = filters
+  if (
+    categories.length === 0 &&
+    statuses.length === 0 &&
+    agentClasses.length === 0 &&
+    tags.length === 0 &&
+    clusters.length === 0
+  ) {
     return sessions
   }
   return sessions.filter((session) => {
@@ -68,6 +82,17 @@ export function filterSessionsByFacets(
       // match a category selection.
       const cats = facets?.sessions[session.id]?.toolCategories
       if (!cats || !categories.some((c) => (cats[c] ?? 0) > 0)) return false
+    }
+    if (tags.length > 0) {
+      // Same rule: no facet row means no NLP tags, so no tag can match.
+      const sessionTags = facets?.sessions[session.id]?.tags
+      if (!sessionTags || !tags.some((t) => sessionTags.includes(t))) return false
+    }
+    if (clusters.length > 0) {
+      const cluster = facets?.sessions[session.id]?.cluster
+      if (cluster === null || cluster === undefined || !clusters.includes(String(cluster))) {
+        return false
+      }
     }
     return true
   })
@@ -107,18 +132,24 @@ interface FacetBarProps {
 
 /**
  * Multi-select facet filter bar for the sessions-list theme: tool category
- * (from /sessions/facets), status, and harness (agent classes, derived from
- * the sessions prop). Selections persist in the UI store across theme
- * switches. Project filtering stays in the sidebar.
+ * (from /sessions/facets), status, harness (agent classes, derived from
+ * the sessions prop), NLP tags and KMeans cluster (both from /sessions/
+ * facets). Selections persist in the UI store across theme switches.
+ * Project filtering stays in the sidebar.
  */
 export function FacetBar({ sessions, facets }: FacetBarProps) {
   const facetCategories = useUIStore((s) => s.facetCategories)
   const facetStatuses = useUIStore((s) => s.facetStatuses)
   const facetAgentClasses = useUIStore((s) => s.facetAgentClasses)
+  const facetTags = useUIStore((s) => s.facetTags)
+  const facetClusters = useUIStore((s) => s.facetClusters)
   const toggleFacetCategory = useUIStore((s) => s.toggleFacetCategory)
   const toggleFacetStatus = useUIStore((s) => s.toggleFacetStatus)
   const toggleFacetAgentClass = useUIStore((s) => s.toggleFacetAgentClass)
+  const toggleFacetTag = useUIStore((s) => s.toggleFacetTag)
+  const toggleFacetCluster = useUIStore((s) => s.toggleFacetCluster)
   const clearFacetFilters = useUIStore((s) => s.clearFacetFilters)
+  const [tagsExpanded, setTagsExpanded] = useState(false)
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -141,7 +172,16 @@ export function FacetBar({ sessions, facets }: FacetBarProps) {
   if (sessions.length === 0) return null
 
   const hasSelection =
-    facetCategories.length > 0 || facetStatuses.length > 0 || facetAgentClasses.length > 0
+    facetCategories.length > 0 ||
+    facetStatuses.length > 0 ||
+    facetAgentClasses.length > 0 ||
+    facetTags.length > 0 ||
+    facetClusters.length > 0
+
+  const tagEntries = Object.entries(facets?.tagSessionCounts ?? {})
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+  const visibleTagEntries = tagsExpanded ? tagEntries : tagEntries.slice(0, TAG_PILL_LIMIT)
 
   const groups: { pills: FacetPill[] }[] = [
     {
@@ -177,6 +217,24 @@ export function FacetBar({ sessions, facets }: FacetBarProps) {
           onToggle: () => toggleFacetAgentClass(agentClass),
         })),
     },
+    {
+      pills: visibleTagEntries.map(([tag, count]) => ({
+        value: tag,
+        label: tag,
+        count,
+        active: facetTags.includes(tag),
+        onToggle: () => toggleFacetTag(tag),
+      })),
+    },
+    {
+      pills: (facets?.clustersPresent ?? []).map((cluster) => ({
+        value: String(cluster),
+        label: `Cluster ${cluster}`,
+        count: Object.values(facets?.sessions ?? {}).filter((f) => f.cluster === cluster).length,
+        active: facetClusters.includes(String(cluster)),
+        onToggle: () => toggleFacetCluster(String(cluster)),
+      })),
+    },
   ].filter((group) => group.pills.length > 0)
 
   if (groups.length === 0) return null
@@ -190,6 +248,17 @@ export function FacetBar({ sessions, facets }: FacetBarProps) {
           ))}
         </div>
       ))}
+      {tagEntries.length > TAG_PILL_LIMIT && (
+        <Button
+          variant="ghost"
+          size="xs"
+          className="rounded-full text-muted-foreground"
+          onClick={() => setTagsExpanded((v) => !v)}
+          title={tagsExpanded ? 'Show fewer tags' : 'Show all tags'}
+        >
+          {tagsExpanded ? 'Less' : `+${tagEntries.length - TAG_PILL_LIMIT} more`}
+        </Button>
+      )}
       {hasSelection && (
         <Button
           variant="ghost"

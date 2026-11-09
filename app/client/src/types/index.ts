@@ -129,13 +129,22 @@ export interface SessionFacetRow {
   toolFailures: number
   permissionDenied: number
   subagentEvents: number
+  /** Batch NLP tags (observe.db session_tags), top-weight first, max 8. */
+  tags: string[]
+  /** KMeans cluster id; null when the session has no cluster row. */
+  cluster: number | null
 }
 
 export interface SessionFacets {
-  /** Per-session facet rows. Sessions with no tool/error events are absent. */
+  /** Per-session facet rows. Sessions with no tool/error/tag/cluster data
+   * are absent. */
   sessions: Record<string, SessionFacetRow>
   /** How many sessions used each tool category. */
   categorySessionCounts: Record<string, number>
+  /** tag → session count, capped at the most common tags. */
+  tagSessionCounts: Record<string, number>
+  /** Sorted distinct cluster ids present in the data. */
+  clustersPresent: number[]
 }
 
 export interface NotificationPayload {

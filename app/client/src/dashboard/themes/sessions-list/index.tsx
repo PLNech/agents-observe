@@ -16,6 +16,8 @@ function SessionsListView({ sessions, isLoading }: DashboardThemeProps) {
   const facetCategories = useUIStore((s) => s.facetCategories)
   const facetStatuses = useUIStore((s) => s.facetStatuses)
   const facetAgentClasses = useUIStore((s) => s.facetAgentClasses)
+  const facetTags = useUIStore((s) => s.facetTags)
+  const facetClusters = useUIStore((s) => s.facetClusters)
   const { data: facets } = useSessionFacets()
 
   const filteredSessions = useMemo(
@@ -24,8 +26,10 @@ function SessionsListView({ sessions, isLoading }: DashboardThemeProps) {
         categories: facetCategories,
         statuses: facetStatuses,
         agentClasses: facetAgentClasses,
+        tags: facetTags,
+        clusters: facetClusters,
       }),
-    [sessions, facets, facetCategories, facetStatuses, facetAgentClasses],
+    [sessions, facets, facetCategories, facetStatuses, facetAgentClasses, facetTags, facetClusters],
   )
 
   return (

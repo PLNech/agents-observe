@@ -340,9 +340,13 @@ interface UIState {
   facetCategories: string[]
   facetStatuses: string[]
   facetAgentClasses: string[]
+  facetTags: string[]
+  facetClusters: string[]
   toggleFacetCategory: (category: string) => void
   toggleFacetStatus: (status: string) => void
   toggleFacetAgentClass: (agentClass: string) => void
+  toggleFacetTag: (tag: string) => void
+  toggleFacetCluster: (cluster: string) => void
   clearFacetFilters: () => void
 
   // Which home-page dashboard theme is active (persisted to localStorage).
@@ -803,6 +807,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   facetCategories: [],
   facetStatuses: [],
   facetAgentClasses: [],
+  facetTags: [],
+  facetClusters: [],
   toggleFacetCategory: (category) =>
     set((s) => ({
       facetCategories: s.facetCategories.includes(category)
@@ -821,7 +827,26 @@ export const useUIStore = create<UIState>((set, get) => ({
         ? s.facetAgentClasses.filter((c) => c !== agentClass)
         : [...s.facetAgentClasses, agentClass],
     })),
-  clearFacetFilters: () => set({ facetCategories: [], facetStatuses: [], facetAgentClasses: [] }),
+  toggleFacetTag: (tag) =>
+    set((s) => ({
+      facetTags: s.facetTags.includes(tag)
+        ? s.facetTags.filter((t) => t !== tag)
+        : [...s.facetTags, tag],
+    })),
+  toggleFacetCluster: (cluster) =>
+    set((s) => ({
+      facetClusters: s.facetClusters.includes(cluster)
+        ? s.facetClusters.filter((c) => c !== cluster)
+        : [...s.facetClusters, cluster],
+    })),
+  clearFacetFilters: () =>
+    set({
+      facetCategories: [],
+      facetStatuses: [],
+      facetAgentClasses: [],
+      facetTags: [],
+      facetClusters: [],
+    }),
 
   // Default to the constellation view on a fresh load; an explicit prior choice
   // (incl. 'sessions-list') persists via localStorage. Keep the id literal to
