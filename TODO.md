@@ -41,7 +41,7 @@ items to Parked rather than letting them rot. Aim: inbox zero.
   tool-category mix (payload.tool_name → category map, pure SQL, no schema change),
   error/permission counts, harness/agent-classes, duration. Facet bar on the
   sessions-list theme: filter by category, harness, project, status, has-errors.
-- [x] **NLP batch lane.** Shipped 2026-11-09 — `bin/agents-observe-nlp` (SRE,
+- [x] **NLP batch lane.** Shipped 2026-11-09 — `bin/agents-obs-nlp` (SRE,
   uv venv, spaCy sm + bge-m3 via ollama + sklearn): tags → observe.db
   `session_tags` (39 sessions, 414 tags), embeddings → stats.db (strategy c =
   slug+first-3-prompts won purity+silhouette, honest n=39 caveat), clusters
