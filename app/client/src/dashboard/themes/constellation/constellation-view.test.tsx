@@ -107,4 +107,20 @@ describe('ConstellationView', () => {
     fireEvent.click(container.querySelector('svg')!)
     expect(useUIStore.getState().previewSessionId).toBeNull()
   })
+
+  it('zooms the camera on wheel and holds still while a drill-in is focused', () => {
+    mockWindowed = { data: [session('swift-otter')], isLoading: false }
+    const { container } = renderWithProviders(<ConstellationView {...props} />)
+    const svg = container.querySelector('svg')!
+    const zoomInput = () => screen.getByLabelText('zoom') as HTMLInputElement
+    const before = zoomInput().value
+
+    fireEvent.wheel(svg, { deltaY: -480 }) // scroll up → zoom in
+    expect(zoomInput().value).not.toBe(before)
+    const zoomedIn = zoomInput().value
+
+    fireEvent.click(screen.getByText('swift-otter').closest('g.cst-star')!)
+    fireEvent.wheel(svg, { deltaY: -480 })
+    expect(zoomInput().value).toBe(zoomedIn) // camera owned by the drill box
+  })
 })

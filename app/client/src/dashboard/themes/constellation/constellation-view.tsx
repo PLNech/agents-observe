@@ -24,6 +24,8 @@ import {
   viewHToZoomPos,
   zoomPercent,
   fmtDuration,
+  ZOOM_MIN_VIEW,
+  ZOOM_MAX_VIEW,
 } from './scale'
 import { Settings } from 'lucide-react'
 import './constellation.css'
@@ -41,6 +43,8 @@ const DRILL_VIEW_H = 520 // world height when drilled into a session
 // A project touched an hour ago should still read as "big", not collapse to
 // the floor. ~4h gives a smooth falloff over the 24h window.
 const WELL_TAU_SEC = 4 * 60 * 60
+// Wheel zoom rate: a deltaY notch (~100) reads as ~1.17x, smooth on trackpads.
+const WHEEL_ZOOM_RATE = 0.0016
 
 interface NodeMeta {
   id: string
@@ -245,6 +249,42 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
     localStorage.setItem(ZOOM_STORAGE_KEY, String(viewH))
     camRef.current = clampCam({ ...camRef.current, ...camSize() }, worldBoundsRef.current)
   }, [viewH, camSize])
+
+  // Wheel zoom: plain wheel resizes the camera around the pointer (drag still
+  // pans, double-click still recenters). A native non-passive listener because
+  // React's onWheel is passive and could not block page scroll. Skipped while
+  // a drill-in is focused — the camera is owned by the drill box then, and the
+  // ticker/panels keep their native scroll.
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+    const onWheel = (e: WheelEvent) => {
+      if (focusedRef.current || e.deltaY === 0) return
+      e.preventDefault()
+      const factor = Math.exp(e.deltaY * WHEEL_ZOOM_RATE)
+      const vh = clampNum(viewHRef.current * factor, ZOOM_MIN_VIEW, ZOOM_MAX_VIEW)
+      if (vh === viewHRef.current) return // already at a clamp
+      const { w: cw, h: ch } = containerSizeRef.current
+      const aspect = cw && ch ? cw / ch : 16 / 9
+      const rect = svg.getBoundingClientRect()
+      const fx = cw ? (e.clientX - rect.left) / cw : 0.5
+      const fy = ch ? (e.clientY - rect.top) / ch : 0.5
+      const cam = camRef.current
+      // keep the world point under the cursor fixed while the camera resizes
+      const wx = cam.cx - cam.w / 2 + fx * cam.w
+      const wy = cam.cy - cam.h / 2 + fy * cam.h
+      const nw = vh * aspect
+      camRef.current = clampCam(
+        { cx: wx + nw / 2 - fx * nw, cy: wy + vh / 2 - fy * vh, w: nw, h: vh },
+        worldBoundsRef.current,
+      )
+      // wheel can outrun React commits — keep the imperative base fresh
+      viewHRef.current = vh
+      setViewH(vh)
+    }
+    svg.addEventListener('wheel', onWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', onWheel)
+  }, [setViewH])
 
   // Measure the container for px↔world conversion and camera aspect.
   useEffect(() => {
@@ -806,7 +846,7 @@ function ConstellationControls({
               Recenter
             </button>
           </div>
-          <div className="cst-meta">drag to pan · double-click to recenter</div>
+          <div className="cst-meta">drag to pan · scroll to zoom · double-click to recenter</div>
         </div>
       )}
     </div>
