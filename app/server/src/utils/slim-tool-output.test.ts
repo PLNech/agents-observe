@@ -44,7 +44,11 @@ describe('slimValue', () => {
 
 describe('slimToolOutput', () => {
   test('PostToolUse: only tool_response changes', () => {
-    const payload = { tool_name: 'Bash', tool_input: { command: big }, tool_response: { stdout: big } }
+    const payload = {
+      tool_name: 'Bash',
+      tool_input: { command: big },
+      tool_response: { stdout: big },
+    }
     const out = slimToolOutput('PostToolUse', payload) as any
     expect(out.tool_input.command).toBe(big)
     expect(out.tool_response.stdout).toMatch(/^\[omitted/)
