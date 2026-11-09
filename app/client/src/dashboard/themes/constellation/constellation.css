@@ -25,6 +25,18 @@
   --c-dots: oklch(0.35 0 0 / 0.5);
   --c-ok: #4ade80;
   --c-stopped: #6b7280;
+
+  /* tool-category star colors (order mirrors TOOL_CATEGORIES) */
+  --c-cat-shell: #f97316;
+  --c-cat-edit: #facc15;
+  --c-cat-read: #60a5fa;
+  --c-cat-web: #22d3ee;
+  --c-cat-delegate: #a78bfa;
+  --c-cat-skill: #f472b6;
+  --c-cat-mcp: #34d399;
+  --c-cat-meta: #94a3b8;
+  --c-cat-ask: #fb7185;
+  --c-cat-other: #64748b;
 }
 
 .constellation[data-palette='space'] {
@@ -39,6 +51,16 @@
   --c-dots: rgba(150, 180, 255, 0.45);
   --c-ok: #6ee7ff;
   --c-stopped: #4a5578;
+  --c-cat-shell: #ff9e64;
+  --c-cat-edit: #7aa2ff;
+  --c-cat-read: #6ee7ff;
+  --c-cat-web: #73daca;
+  --c-cat-delegate: #bb9af7;
+  --c-cat-skill: #ff75a0;
+  --c-cat-mcp: #9ece6a;
+  --c-cat-meta: #8990b8;
+  --c-cat-ask: #ff5c7a;
+  --c-cat-other: #4a5578;
 }
 
 .constellation[data-palette='biolum'] {
@@ -53,6 +75,16 @@
   --c-dots: rgba(94, 234, 212, 0.45);
   --c-ok: #5eead4;
   --c-stopped: #2f5d54;
+  --c-cat-shell: #fbbf24;
+  --c-cat-edit: #a3e635;
+  --c-cat-read: #5eead4;
+  --c-cat-web: #38bdf8;
+  --c-cat-delegate: #818cf8;
+  --c-cat-skill: #f472b6;
+  --c-cat-mcp: #34d399;
+  --c-cat-meta: #94a3b8;
+  --c-cat-ask: #fb7185;
+  --c-cat-other: #4b635c;
 }
 
 .constellation {
@@ -357,6 +389,31 @@
   font-size: 10px;
   color: var(--c-muted);
   margin-top: 8px;
+}
+
+/* tool-mix legend: swatch colors follow the active palette's --c-cat-* */
+.cst-legend {
+  right: 12px;
+  bottom: 12px;
+}
+.cst-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px 14px;
+}
+.cst-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--c-muted);
+  white-space: nowrap;
+}
+.cst-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
 }
 
 .cst-tooltip {

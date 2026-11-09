@@ -2,6 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { useNotificationStore } from '@/components/sidebar/notification-indicator'
 import { useWindowedSessions } from '@/hooks/use-windowed-sessions'
+import { useSessionFacets } from '@/hooks/use-session-facets'
+import {
+  TOOL_CATEGORIES,
+  TOOL_CATEGORY_LABELS,
+  dominantToolCategory,
+  type ToolCategory,
+} from '@/lib/tool-categories'
 import type { DashboardThemeProps } from '../../types'
 import type { RecentSession } from '@/types'
 import {
@@ -103,6 +110,23 @@ const DEFAULT_RGB = { cool: [91, 107, 130], warm: [250, 204, 21], hot: [249, 115
   hot: RGB
 }
 
+// Tool-category colors (stars tinted by their dominant tool category). The
+// actual values live as --c-cat-* custom properties in constellation.css, one
+// set per palette; these native hexes are the safe default until the first
+// getComputedStyle read, mirroring DEFAULT_RGB.
+const DEFAULT_CAT_COLORS: Record<ToolCategory, string> = {
+  shell: '#f97316',
+  edit: '#facc15',
+  read: '#60a5fa',
+  web: '#22d3ee',
+  delegate: '#a78bfa',
+  skill: '#f472b6',
+  mcp: '#34d399',
+  meta: '#94a3b8',
+  ask: '#fb7185',
+  other: '#64748b',
+}
+
 export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
@@ -128,6 +152,10 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
   // The constellation renders an activity window, not the host's recent-30.
   const { data: sessions = [], isLoading } = useWindowedSessions(windowMs)
 
+  // Per-session tool-category mixes (shared with the facet bar's query cache):
+  // stars tint by their dominant category, sized by event count via baseR.
+  const { data: facets } = useSessionFacets()
+
   // Attention flags from the global notification store (pending && !dismissed).
   const pending = useNotificationStore((s) => s.pending)
   const dismissed = useNotificationStore((s) => s.dismissed)
@@ -151,6 +179,20 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
       })),
     [sessions],
   )
+
+  // Dominant tool category per session, from the facet rows. Sessions with no
+  // facet row (no recorded tool use) stay absent → default heat coloring.
+  const catBySession = useMemo(() => {
+    const map = new Map<string, ToolCategory>()
+    if (!facets) return map
+    for (const m of nodes) {
+      const row = facets.sessions[m.id]
+      if (!row) continue
+      const cat = dominantToolCategory(row.toolCategories)
+      if (cat) map.set(m.id, cat)
+    }
+    return map
+  }, [facets, nodes])
 
   // Pack project wells, sized by aggregate recency heat (busiest = biggest,
   // centred). Recomputed when the session set changes (which happens on each
@@ -200,6 +242,8 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
   const flaggedRef = useRef(flaggedSet)
   const focusedRef = useRef<string | null>(null)
   const paletteRgbRef = useRef(DEFAULT_RGB)
+  const catColorsRef = useRef<Record<string, string>>({ ...DEFAULT_CAT_COLORS })
+  const catBySessionRef = useRef(new Map<string, ToolCategory>())
   const tauRef = useRef(tau)
   const viewHRef = useRef(viewH)
 
@@ -230,6 +274,9 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
   useEffect(() => {
     focusedRef.current = focusedId
   }, [focusedId])
+  useEffect(() => {
+    catBySessionRef.current = catBySession
+  }, [catBySession])
 
   const camSize = useCallback((): { w: number; h: number } => {
     const { w, h } = containerSizeRef.current
@@ -355,7 +402,7 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
     }
   }, [wells, worldBounds, camSize])
 
-  // Recompute cached palette RGBs whenever the palette changes.
+  // Recompute cached palette RGBs + category colors whenever the palette changes.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -364,11 +411,20 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
       const v = cs.getPropertyValue(name).trim()
       return v ? parseColor(v) : fallback
     }
+    const readRaw = (name: string, fallback: string): string => {
+      const v = cs.getPropertyValue(name).trim()
+      return v || fallback
+    }
     paletteRgbRef.current = {
       cool: read('--c-cool', DEFAULT_RGB.cool),
       warm: read('--c-warm', DEFAULT_RGB.warm),
       hot: read('--c-hot', DEFAULT_RGB.hot),
     }
+    const catColors: Record<string, string> = {}
+    for (const category of TOOL_CATEGORIES) {
+      catColors[category] = readRaw(`--c-cat-${category}`, DEFAULT_CAT_COLORS[category])
+    }
+    catColorsRef.current = catColors
   }, [paletteId])
 
   const registerNode = useCallback((id: string, g: SVGGElement | null) => {
@@ -434,7 +490,10 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
         const els = elRef.current.get(m.id)
         if (!s || !els) continue
         const h = s.heat
-        const col = tempColor(h, cool, warm, hot)
+        // Category-tinted when a facet row gives a dominant tool category,
+        // else the classic heat ramp. Heat still drives size, glow and opacity.
+        const cat = catBySessionRef.current.get(m.id)
+        const col = (cat && catColorsRef.current[cat]) || tempColor(h, cool, warm, hot)
         const r = m.baseR * (0.82 + 0.18 * h)
         els.g.style.transform = `translate(${s.x}px, ${s.y}px)`
         els.g.style.opacity = s.attention ? '1' : (0.2 + 0.8 * h).toFixed(3)
@@ -463,12 +522,16 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
     const t = tooltipRef.current
     if (!t || draggingRef.current) return
     const flagged = flaggedRef.current.has(m.id)
+    const cat = catBySessionRef.current.get(m.id)
     t.style.opacity = '1'
     t.style.left = `${e.clientX}px`
     t.style.top = `${e.clientY + 16}px`
     t.innerHTML =
       `<div class="cst-tt-slug">${m.slug}</div>` +
       `<div class="cst-tt-row"><span>project</span><b>${m.projectName}</b></div>` +
+      (cat
+        ? `<div class="cst-tt-row"><span>top tool</span><b>${TOOL_CATEGORY_LABELS[cat]}</b></div>`
+        : '') +
       `<div class="cst-tt-row"><span>subagents</span><b>${m.orbitDots}</b></div>` +
       (flagged ? `<div class="cst-tt-attn">● needs attention</div>` : '')
   }
@@ -736,6 +799,25 @@ export function ConstellationView({ onOpenSession }: DashboardThemeProps) {
         onTau={setTau}
         onRecenter={recenter}
       />
+
+      {/* Tool-mix legend: the star colors map to a session's dominant tool
+          category. Hidden while drilled in, where the ticker takes the edge. */}
+      {!focusedId && (
+        <div className="cst-legend cst-panel">
+          <div className="cst-panel-h">Tool mix</div>
+          <div className="cst-legend-grid">
+            {TOOL_CATEGORIES.map((category) => (
+              <div key={category} className="cst-legend-item">
+                <span
+                  className="cst-legend-swatch"
+                  style={{ background: `var(--c-cat-${category})` }}
+                />
+                {TOOL_CATEGORY_LABELS[category]}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="cst-tooltip" ref={tooltipRef} />
     </div>

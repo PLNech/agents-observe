@@ -3,13 +3,31 @@ import { cleanup, screen, fireEvent } from '@testing-library/react'
 import { renderWithProviders } from '@/test/test-utils'
 import { useUIStore } from '@/stores/ui-store'
 import { ConstellationView } from './constellation-view'
-import type { RecentSession } from '@/types'
+import type { RecentSession, SessionFacets } from '@/types'
 
 // The constellation fetches its own activity-windowed sessions; mock that hook.
 let mockWindowed: { data: RecentSession[]; isLoading: boolean } = { data: [], isLoading: false }
 vi.mock('@/hooks/use-windowed-sessions', () => ({
   useWindowedSessions: () => mockWindowed,
 }))
+
+// Star tinting reads the shared facet query; mock that hook too.
+let mockFacets: { data: SessionFacets | undefined } = { data: undefined }
+vi.mock('@/hooks/use-session-facets', () => ({
+  useSessionFacets: () => mockFacets,
+}))
+
+function facetRow(over: Partial<SessionFacets['sessions'][string]> = {}) {
+  return {
+    toolCategories: {},
+    toolFailures: 0,
+    permissionDenied: 0,
+    subagentEvents: 0,
+    tags: [],
+    cluster: null,
+    ...over,
+  }
+}
 
 function session(id: string, over: Partial<RecentSession> = {}): RecentSession {
   return {
@@ -36,6 +54,7 @@ afterEach(() => {
   cleanup()
   useUIStore.getState().clearPreviewSession()
   mockWindowed = { data: [], isLoading: false }
+  mockFacets = { data: undefined }
 })
 
 describe('ConstellationView', () => {
@@ -122,5 +141,48 @@ describe('ConstellationView', () => {
     fireEvent.click(screen.getByText('swift-otter').closest('g.cst-star')!)
     fireEvent.wheel(svg, { deltaY: -480 })
     expect(zoomInput().value).toBe(zoomedIn) // camera owned by the drill box
+  })
+
+  it('shows the tool-category legend and hides it while drilled in', () => {
+    mockWindowed = { data: [session('a')], isLoading: false }
+    renderWithProviders(<ConstellationView {...props} />)
+    expect(screen.getByText('Tool mix')).toBeTruthy()
+    expect(screen.getByText('Shell')).toBeTruthy()
+    expect(screen.getByText('Delegate')).toBeTruthy()
+
+    fireEvent.click(screen.getByText('a').closest('g.cst-star')!)
+    expect(screen.queryByText('Tool mix')).toBeNull() // ticker takes the edge
+  })
+
+  it('tints stars by dominant tool category, default look without a facet row', () => {
+    mockWindowed = { data: [session('a'), session('b')], isLoading: false }
+    mockFacets = {
+      data: {
+        sessions: { a: facetRow({ toolCategories: { shell: 4, read: 1 } }) },
+        categorySessionCounts: {},
+        tagSessionCounts: {},
+        clustersPresent: [],
+      },
+    }
+    const raf = vi
+      .spyOn(globalThis, 'requestAnimationFrame')
+      .mockImplementation((cb: FrameRequestCallback) => {
+        if (!fired) {
+          fired = true
+          cb(0)
+        }
+        return 0
+      })
+    let fired = false
+    const { container } = renderWithProviders(<ConstellationView {...props} />)
+    raf.mockRestore()
+    const coreFill = (slug: string) => {
+      const star = [...container.querySelectorAll('g.cst-star')].find(
+        (g) => g.querySelector('text')?.textContent === slug,
+      )!
+      return star.querySelector('.cst-core')!.getAttribute('fill')
+    }
+    expect(coreFill('a')).toBe('#f97316') // shell tint (jsdom has no CSS vars → native default)
+    expect(coreFill('b')).toMatch(/^rgb\(/) // no facet row → classic heat ramp
   })
 })

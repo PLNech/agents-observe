@@ -2,36 +2,8 @@ import { useMemo, useState } from 'react'
 import { useUIStore } from '@/stores/ui-store'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { TOOL_CATEGORIES, TOOL_CATEGORY_LABELS } from '@/lib/tool-categories'
 import type { RecentSession, SessionFacets } from '@/types'
-
-// Mirrors the server's closed category set
-// (app/server/src/utils/tool-categories.ts). Duplicated client-side so the
-// dashboard bundle never imports server code; keep the two in sync.
-const TOOL_CATEGORIES = [
-  'shell',
-  'edit',
-  'read',
-  'web',
-  'delegate',
-  'skill',
-  'mcp',
-  'meta',
-  'ask',
-  'other',
-] as const
-
-const TOOL_CATEGORY_LABELS: Record<(typeof TOOL_CATEGORIES)[number], string> = {
-  shell: 'Shell',
-  edit: 'Edit',
-  read: 'Read',
-  web: 'Web',
-  delegate: 'Delegate',
-  skill: 'Skill',
-  mcp: 'MCP',
-  meta: 'Meta',
-  ask: 'Ask',
-  other: 'Other',
-}
 
 const STATUS_LABELS: Record<string, string> = {
   active: 'Active',
