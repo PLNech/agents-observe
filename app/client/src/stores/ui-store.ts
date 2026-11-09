@@ -333,6 +333,18 @@ interface UIState {
   sessionSortOrder: 'activity' | 'created'
   setSessionSortOrder: (order: 'activity' | 'created') => void
 
+  // Dashboard facet filters (sessions-list facet bar). Multi-select pill
+  // toggles; an empty selection means no constraint on that axis. In-memory
+  // like sessionSortOrder — the store outlives theme switches, resets on
+  // reload. Filter application lives in facet-bar.tsx.
+  facetCategories: string[]
+  facetStatuses: string[]
+  facetAgentClasses: string[]
+  toggleFacetCategory: (category: string) => void
+  toggleFacetStatus: (status: string) => void
+  toggleFacetAgentClass: (agentClass: string) => void
+  clearFacetFilters: () => void
+
   // Which home-page dashboard theme is active (persisted to localStorage).
   // See app/client/src/dashboard/ — the registry resolves unknown ids to
   // the default theme, so this is a free-form string, not a union.
@@ -787,6 +799,29 @@ export const useUIStore = create<UIState>((set, get) => ({
 
   sessionSortOrder: 'activity',
   setSessionSortOrder: (order) => set({ sessionSortOrder: order }),
+
+  facetCategories: [],
+  facetStatuses: [],
+  facetAgentClasses: [],
+  toggleFacetCategory: (category) =>
+    set((s) => ({
+      facetCategories: s.facetCategories.includes(category)
+        ? s.facetCategories.filter((c) => c !== category)
+        : [...s.facetCategories, category],
+    })),
+  toggleFacetStatus: (status) =>
+    set((s) => ({
+      facetStatuses: s.facetStatuses.includes(status)
+        ? s.facetStatuses.filter((v) => v !== status)
+        : [...s.facetStatuses, status],
+    })),
+  toggleFacetAgentClass: (agentClass) =>
+    set((s) => ({
+      facetAgentClasses: s.facetAgentClasses.includes(agentClass)
+        ? s.facetAgentClasses.filter((c) => c !== agentClass)
+        : [...s.facetAgentClasses, agentClass],
+    })),
+  clearFacetFilters: () => set({ facetCategories: [], facetStatuses: [], facetAgentClasses: [] }),
 
   // Default to the constellation view on a fresh load; an explicit prior choice
   // (incl. 'sessions-list') persists via localStorage. Keep the id literal to

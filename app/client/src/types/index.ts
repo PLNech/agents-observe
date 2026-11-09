@@ -118,6 +118,26 @@ export interface RecentSession {
   agentCount?: number
 }
 
+/**
+ * Facet aggregates from GET /sessions/facets — per-session tool-category
+ * mix + error counts used by the sessions-list facet bar. Mirrors the
+ * server's SessionFacets (app/server/src/storage/types.ts).
+ */
+export interface SessionFacetRow {
+  /** Tool-name category → event count (PostToolUse events only). */
+  toolCategories: Record<string, number>
+  toolFailures: number
+  permissionDenied: number
+  subagentEvents: number
+}
+
+export interface SessionFacets {
+  /** Per-session facet rows. Sessions with no tool/error events are absent. */
+  sessions: Record<string, SessionFacetRow>
+  /** How many sessions used each tool category. */
+  categorySessionCounts: Record<string, number>
+}
+
 export interface NotificationPayload {
   sessionId: string
   projectId: number

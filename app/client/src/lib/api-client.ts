@@ -6,6 +6,7 @@ import type {
   ServerAgent,
   ParsedEvent,
   NotificationPayload,
+  SessionFacets,
   Filter,
 } from '@/types'
 
@@ -100,6 +101,7 @@ export const api = {
   },
   getUnassignedSessions: (limit?: number) =>
     fetchJson<RecentSession[]>(`/sessions/unassigned${limit ? `?limit=${limit}` : ''}`),
+  getSessionFacets: () => fetchJson<SessionFacets>('/sessions/facets'),
   getSessions: (projectId: number) => fetchJson<Session[]>(`/projects/${projectId}/sessions`),
   getSession: (sessionId: string) =>
     fetchJson<Session>(`/sessions/${encodeURIComponent(sessionId)}`),
