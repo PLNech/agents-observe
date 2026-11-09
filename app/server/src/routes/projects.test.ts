@@ -99,8 +99,19 @@ describe('project leboard routes', () => {
       const res = await app.request('/api/projects/leboard-suggestions')
       expect(res.status).toBe(200)
       const body = await res.json()
-      expect(body).toEqual({ available: false, suggestions: [] })
+      expect(body).toEqual({ available: false, projects: [], suggestions: [] })
       expect(mockStore.getProjects).not.toHaveBeenCalled()
+    })
+
+    test('carries the full leboard project list for the picker', async () => {
+      mockStore.getProjects.mockResolvedValue([])
+      listProjects.mockResolvedValue({
+        available: true,
+        projects: [{ id: 'sre', name: 'SRE' }],
+      })
+      const res = await app.request('/api/projects/leboard-suggestions')
+      const body = await res.json()
+      expect(body.projects).toEqual([{ id: 'sre', name: 'SRE' }])
     })
 
     test('best is null when LeBoard has no projects', async () => {

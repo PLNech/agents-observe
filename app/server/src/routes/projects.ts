@@ -79,7 +79,7 @@ router.get('/projects/leboard-suggestions', async (c) => {
   const store = c.get('store')
   const leboard = await leboardClient.listProjects()
   if (!leboard.available) {
-    return c.json({ available: false, suggestions: [] })
+    return c.json({ available: false, projects: [], suggestions: [] })
   }
 
   const rows = await store.getProjects()
@@ -95,7 +95,9 @@ router.get('/projects/leboard-suggestions', async (c) => {
         runnerUp: matches[1] ?? null,
       }
     })
-  return c.json({ available: true, suggestions })
+  // `projects` carries the full LeBoard list so the client's "pick from
+  // list" picker works without a second endpoint.
+  return c.json({ available: true, projects: leboard.projects, suggestions })
 })
 
 router.get('/projects/:id/sessions', async (c) => {
