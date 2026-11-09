@@ -177,9 +177,21 @@ describe('GET /api/sessions/facets', () => {
           toolFailures: 1,
           permissionDenied: 0,
           subagentEvents: 2,
+          tags: ['git', 'sqlite'],
+          cluster: 2,
+        },
+        sess2: {
+          toolCategories: {},
+          toolFailures: 0,
+          permissionDenied: 0,
+          subagentEvents: 0,
+          tags: [],
+          cluster: null,
         },
       },
       categorySessionCounts: { shell: 1, edit: 1 },
+      tagSessionCounts: { git: 1, sqlite: 1 },
+      clustersPresent: [2],
     }
     mockStore.getSessionFacets.mockResolvedValue(facets)
 

@@ -1062,14 +1062,40 @@ describe('SqliteAdapter — getSessionFacets', () => {
       timestamp: 1007,
     })
 
+    // Batch NLP tables (written by agents-observe-nlp, read-only here).
+    ;(store as any).db.exec(`
+      CREATE TABLE session_tags (
+        session_id TEXT, tag TEXT, source TEXT, weight REAL,
+        provenance TEXT, created_at INTEGER);
+      CREATE TABLE session_clusters (
+        session_id TEXT, k_best INTEGER, cluster INTEGER, silhouette REAL,
+        created_at INTEGER, PRIMARY KEY (session_id));
+    `)
+    ;(store as any).db
+      .prepare('INSERT INTO session_tags VALUES (?,?,?,?,?,?)')
+      .run('sess1', 'keyword', 'spacy', 0.4, 'en_core_web_sm', 1000)
+    ;(store as any).db
+      .prepare('INSERT INTO session_tags VALUES (?,?,?,?,?,?)')
+      .run('sess1', 'entity:acme', 'spacy', 1.0, 'en_core_web_sm', 1000)
+    ;(store as any).db
+      .prepare('INSERT INTO session_tags VALUES (?,?,?,?,?,?)')
+      .run('sess1', 'minor', 'spacy', 0.1, 'en_core_web_sm', 1000)
+    ;(store as any).db
+      .prepare('INSERT INTO session_clusters VALUES (?,?,?,?,?)')
+      .run('sess1', 4, 2, 0.09, 1000)
+
     const facets = await store.getSessionFacets()
     expect(facets.sessions['sess1']).toEqual({
       toolCategories: { shell: 2, mcp: 1, other: 1 },
       toolFailures: 1,
       permissionDenied: 1,
       subagentEvents: 1,
+      tags: ['entity:acme', 'keyword', 'minor'],
+      cluster: 2,
     })
     expect(facets.categorySessionCounts).toEqual({ shell: 1, mcp: 1, other: 1 })
+    expect(facets.tagSessionCounts).toEqual({ 'entity:acme': 1, keyword: 1, minor: 1 })
+    expect(facets.clustersPresent).toEqual([2])
   })
 
   test('counts the tool mix from PostToolUse only (no PreToolUse double-count)', async () => {
@@ -1127,6 +1153,85 @@ describe('SqliteAdapter — getSessionFacets', () => {
 
     const facets = await store.getSessionFacets()
     expect(facets.sessions['sess1'].toolCategories).toEqual({ other: 1 })
+  })
+
+  test('caps per-session tags by weight (top first) and counts sessions per tag', async () => {
+    await store.createProject('proj1', 'Project 1')
+    await store.upsertSession('sess1', 1, null, null, 1000)
+    await store.upsertSession('sess2', 1, null, null, 1001)
+    ;(store as any).db.exec(`
+      CREATE TABLE session_tags (
+        session_id TEXT, tag TEXT, source TEXT, weight REAL,
+        provenance TEXT, created_at INTEGER);
+      CREATE TABLE session_clusters (
+        session_id TEXT, k_best INTEGER, cluster INTEGER, silhouette REAL,
+        created_at INTEGER, PRIMARY KEY (session_id));
+    `)
+    const tag = (store as any).db.prepare('INSERT INTO session_tags VALUES (?,?,?,?,?,?)')
+    // 9 tags for sess1; FACET_TAG_LIMIT is 8 — the lowest weight drops off.
+    for (let i = 0; i < 9; i++) {
+      tag.run('sess1', `tag-${i}`, 'spacy', 1 - i * 0.1, 'en_core_web_sm', 1000)
+    }
+    tag.run('sess2', 'shared', 'spacy', 0.5, 'en_core_web_sm', 1000)
+    tag.run('sess1', 'shared', 'spacy', 0.9, 'en_core_web_sm', 1000)
+
+    const facets = await store.getSessionFacets()
+    expect(facets.sessions['sess1'].tags).toHaveLength(8)
+    expect(facets.sessions['sess1'].tags[0]).toBe('tag-0')
+    expect(facets.sessions['sess1'].tags).toContain('shared')
+    expect(facets.sessions['sess1'].tags).not.toContain('tag-7')
+    expect(facets.sessions['sess1'].tags).not.toContain('tag-8')
+    expect(facets.tagSessionCounts['shared']).toBe(2)
+  })
+
+  test('exposes tags and clusters for sessions with no tool events', async () => {
+    await store.createProject('proj1', 'Project 1')
+    await store.upsertSession('sess1', 1, null, null, 1000)
+    ;(store as any).db.exec(`
+      CREATE TABLE session_tags (
+        session_id TEXT, tag TEXT, source TEXT, weight REAL,
+        provenance TEXT, created_at INTEGER);
+      CREATE TABLE session_clusters (
+        session_id TEXT, k_best INTEGER, cluster INTEGER, silhouette REAL,
+        created_at INTEGER, PRIMARY KEY (session_id));
+    `)
+    ;(store as any).db
+      .prepare('INSERT INTO session_tags VALUES (?,?,?,?,?,?)')
+      .run('sess1', 'keyword', 'spacy', 0.5, 'en_core_web_sm', 1000)
+    ;(store as any).db
+      .prepare('INSERT INTO session_clusters VALUES (?,?,?,?,?)')
+      .run('sess1', 4, 0, 0.09, 1000)
+
+    const facets = await store.getSessionFacets()
+    expect(facets.sessions['sess1']).toEqual({
+      toolCategories: {},
+      toolFailures: 0,
+      permissionDenied: 0,
+      subagentEvents: 0,
+      tags: ['keyword'],
+      cluster: 0,
+    })
+    expect(facets.tagSessionCounts).toEqual({ keyword: 1 })
+    expect(facets.clustersPresent).toEqual([0])
+  })
+
+  test('returns empty tag/cluster structures when the NLP tables do not exist yet', async () => {
+    await store.createProject('proj1', 'Project 1')
+    await store.upsertSession('sess1', 1, null, null, 1000)
+    await store.upsertAgent('a1', 'sess1', null, null, null)
+    await insertHookEvent({
+      agentId: 'a1',
+      sessionId: 'sess1',
+      hookName: 'PostToolUse',
+      timestamp: 1000,
+      payload: { tool_name: 'Bash' },
+    })
+
+    const facets = await store.getSessionFacets()
+    expect(facets.sessions['sess1'].tags).toEqual([])
+    expect(facets.sessions['sess1'].cluster).toBeNull()
+    expect(facets.tagSessionCounts).toEqual({})
+    expect(facets.clustersPresent).toEqual([])
   })
 })
 

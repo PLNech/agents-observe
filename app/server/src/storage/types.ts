@@ -200,13 +200,23 @@ export interface SessionFacetRow {
   permissionDenied: number
   /** SubagentStart events. */
   subagentEvents: number
+  /** Batch NLP tags (observe.db session_tags), top-weight first, capped. */
+  tags: string[]
+  /** KMeans cluster id from the observe.db session_clusters mirror; null
+   * when the session has no row (untagged corpus or table absent). */
+  cluster: number | null
 }
 
 export interface SessionFacets {
-  /** Per-session facet rows. Sessions with no tool/error events are absent. */
+  /** Per-session facet rows. Sessions with no tool/error/tag/cluster data
+   * are absent. */
   sessions: Record<string, SessionFacetRow>
   /** How many sessions used each tool category. */
   categorySessionCounts: Record<string, number>
+  /** tag → session count, capped at the most common tags. */
+  tagSessionCounts: Record<string, number>
+  /** Sorted distinct cluster ids present in the mirror table. */
+  clustersPresent: number[]
 }
 
 export interface OrphanRepairResult {

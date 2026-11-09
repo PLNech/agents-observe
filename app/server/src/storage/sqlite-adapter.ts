@@ -25,6 +25,12 @@ import type { Filter, FilterRow, FilterPattern } from '../types'
 import { randomUUID } from 'node:crypto'
 import { SEED_FILTERS } from './seed-filters'
 
+// Facet-layer caps for the batch NLP tags (see getSessionFacets): how many
+// tags a single session reports and how many distinct tags the global
+// pill-count map carries.
+const FACET_TAG_LIMIT = 8
+const FACET_TAG_COUNT_CAP = 40
+
 export class SqliteAdapter implements EventStore {
   private db: Database.Database
 
@@ -1456,7 +1462,14 @@ export class SqliteAdapter implements EventStore {
     for (const row of rows) {
       let facet = sessions[row.session_id]
       if (!facet) {
-        facet = { toolCategories: {}, toolFailures: 0, permissionDenied: 0, subagentEvents: 0 }
+        facet = {
+          toolCategories: {},
+          toolFailures: 0,
+          permissionDenied: 0,
+          subagentEvents: 0,
+          tags: [],
+          cluster: null,
+        }
         sessions[row.session_id] = facet
       }
 
@@ -1479,7 +1492,91 @@ export class SqliteAdapter implements EventStore {
       }
     }
 
-    return { sessions, categorySessionCounts }
+    // Batch NLP layer (written by bin/agents-observe-nlp, read-only here):
+    // session_tags for the tag pills, the session_clusters mirror for the
+    // cluster pills. Both tables are absent on a fresh install until the
+    // first NLP run — the reads below are guarded and yield empty facets.
+    const tagRows = this.tableExists('session_tags')
+      ? (this.db.prepare('SELECT session_id, tag, weight FROM session_tags').all() as {
+          session_id: string
+          tag: string
+          weight: number | null
+        }[])
+      : []
+    const tagWeights = new Map<string, { tags: { tag: string; weight: number }[] }>()
+    for (const row of tagRows) {
+      let entry = tagWeights.get(row.session_id)
+      if (!entry) {
+        entry = { tags: [] }
+        tagWeights.set(row.session_id, entry)
+      }
+      entry.tags.push({ tag: row.tag, weight: row.weight ?? 0 })
+    }
+    for (const [sessionId, entry] of tagWeights) {
+      entry.tags.sort((a, b) => b.weight - a.weight || a.tag.localeCompare(b.tag))
+      let facet = sessions[sessionId]
+      if (!facet) {
+        facet = this.emptyFacetRow()
+        sessions[sessionId] = facet
+      }
+      facet.tags = entry.tags.slice(0, FACET_TAG_LIMIT).map((t) => t.tag)
+    }
+
+    const tagSessionTallies = new Map<string, Set<string>>()
+    for (const row of tagRows) {
+      let tally = tagSessionTallies.get(row.tag)
+      if (!tally) {
+        tally = new Set()
+        tagSessionTallies.set(row.tag, tally)
+      }
+      tally.add(row.session_id)
+    }
+    const tagSessionCounts: Record<string, number> = {}
+    for (const [tag, tally] of [...tagSessionTallies.entries()]
+      .sort((a, b) => b[1].size - a[1].size || a[0].localeCompare(b[0]))
+      .slice(0, FACET_TAG_COUNT_CAP)) {
+      tagSessionCounts[tag] = tally.size
+    }
+
+    const clusterRows = this.tableExists('session_clusters')
+      ? (this.db.prepare('SELECT session_id, cluster FROM session_clusters').all() as {
+          session_id: string
+          cluster: number | null
+        }[])
+      : []
+    const clustersPresent = new Set<number>()
+    for (const row of clusterRows) {
+      if (row.cluster === null || !Number.isInteger(row.cluster)) continue
+      clustersPresent.add(row.cluster)
+      let facet = sessions[row.session_id]
+      if (!facet) {
+        facet = this.emptyFacetRow()
+        sessions[row.session_id] = facet
+      }
+      facet.cluster = row.cluster
+    }
+
+    return {
+      sessions,
+      categorySessionCounts,
+      tagSessionCounts,
+      clustersPresent: [...clustersPresent].sort((a, b) => a - b),
+    }
+  }
+
+  private emptyFacetRow(): SessionFacetRow {
+    return {
+      toolCategories: {},
+      toolFailures: 0,
+      permissionDenied: 0,
+      subagentEvents: 0,
+      tags: [],
+      cluster: null,
+    }
+  }
+
+  private tableExists(name: string): boolean {
+    return !!this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(name)
   }
 
   async repairOrphans(): Promise<OrphanRepairResult> {
