@@ -10,6 +10,7 @@ import { api } from '@/lib/api-client'
 import { useUIStore } from '@/stores/ui-store'
 import { EventRow } from './event-row'
 import { TimestampTooltipProvider } from './timestamp-tooltip'
+import { ThinkingCard } from './thinking-card'
 import { format } from 'timeago.js'
 import { buildAgentColorMap } from '@/lib/agent-utils'
 import { QueryBoundary } from '@/components/shared/query-boundary'
@@ -411,6 +412,7 @@ export function EventStream() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
+      <ThinkingCard sessionId={selectedSessionId} />
       <QueryBoundary
         query={displayQuery}
         loading={

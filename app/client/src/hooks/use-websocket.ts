@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { getServerHealth } from '@/lib/server-health'
-import type { WSMessage, WSClientMessage, ParsedEvent, Session, RecentSession } from '@/types'
+import type {
+  WSMessage,
+  WSClientMessage,
+  ParsedEvent,
+  Session,
+  RecentSession,
+  ThinkingBlock,
+  ThinkingBroadcast,
+} from '@/types'
 import { pushNotification, clearNotification } from '@/components/sidebar/notification-indicator'
 import { useUIStore } from '@/stores/ui-store'
 import { useFilterStore } from '@/stores/filter-store'
@@ -45,6 +53,29 @@ function markSessionActiveInCache(queryClient: QueryClient, sessionId: string): 
 }
 
 const WS_URL = `ws://${window.location.host}/api/events/stream`
+
+/** Cap on buffered thinking blocks in the ['thinking', sessionId] cache —
+ *  matches the server's per-session buffer (thinking-tail.ts). */
+const THINKING_CACHE_LIMIT = 50
+
+/**
+ * Merge a WS thinking push into the cached feed. Dedupes on per-session
+ * `seq` (the server re-sends nothing, but a route refetch can overlap a
+ * push), keeps seq order, caps the buffer. Exported for tests.
+ */
+export function mergeThinkingBlocks(
+  old: ThinkingBroadcast | undefined,
+  incoming: ThinkingBlock[],
+): ThinkingBroadcast {
+  const bySeq = new Map<number, ThinkingBlock>()
+  for (const b of old?.blocks ?? []) bySeq.set(b.seq, b)
+  for (const b of incoming) bySeq.set(b.seq, b)
+  const merged = [...bySeq.values()].sort((a, b) => a.seq - b.seq)
+  if (merged.length > THINKING_CACHE_LIMIT) {
+    merged.splice(0, merged.length - THINKING_CACHE_LIMIT)
+  }
+  return { sessionId: old?.sessionId ?? '', blocks: merged }
+}
 
 // Fetch log level from server once on module load. Shares the page-
 // wide /api/health fetch with the version footer + settings modal.
@@ -190,6 +221,18 @@ export function useWebSocket(sessionId: string | null) {
         // refetch re-syncs from the server, so this is client-side
         // only and non-destructive.
         markSessionActiveInCache(queryClient, sessionId)
+      } else if (msg.type === 'thinking') {
+        // Server broadcasts thinking only to subscribed sessions and the
+        // client subscribes to one session at a time, so this always
+        // targets the session in view. Pure cache write — the thinking
+        // card reads it via useQuery.
+        const { sessionId, blocks } = msg.data
+        queryClient.setQueryData<ThinkingBroadcast>(['thinking', sessionId], (old) =>
+          mergeThinkingBlocks(old, blocks),
+        )
+        if (logLevel === 'trace') {
+          console.debug(`[WS] Thinking push → session ${sessionId.slice(0, 8)} (${blocks.length})`)
+        }
       } else if (msg.type === 'filter:created') {
         useFilterStore.getState().upsertFromBroadcast(msg.filter)
       } else if (msg.type === 'filter:updated') {

@@ -187,12 +187,30 @@ export type WSMessage =
       type: 'activity'
       data: { sessionId: string; projectId: number | null; eventId: number; ts: number }
     }
+  | { type: 'thinking'; data: ThinkingBroadcast }
   | { type: 'filter:created'; filter: Filter }
   | { type: 'filter:updated'; filter: Filter }
   | { type: 'filter:deleted'; id: string }
   | { type: 'filter:bulk-changed' }
 
 export type WSClientMessage = { type: 'subscribe'; sessionId: string } | { type: 'unsubscribe' }
+
+/** One thinking block tail-read from the session transcript (server:
+ *  transcript-parser/thinking-tail.ts). Text is truncated server-side
+ *  to 2000 chars; seq is per-session monotonic for duplicate-free merge. */
+export interface ThinkingBlock {
+  ts: number
+  text: string
+  seq: number
+}
+
+/** WS `thinking` push + GET /sessions/:id/thinking response payload. */
+export interface ThinkingBroadcast {
+  sessionId: string
+  blocks: ThinkingBlock[]
+  /** Buffered block count on the server — lets the UI hint "earlier N". */
+  total?: number
+}
 
 // === Filters (mirror server shape) ===
 

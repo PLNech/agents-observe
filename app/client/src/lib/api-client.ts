@@ -8,6 +8,7 @@ import type {
   NotificationPayload,
   SessionFacets,
   Filter,
+  ThinkingBroadcast,
 } from '@/types'
 
 /**
@@ -266,6 +267,24 @@ export const api = {
     if (!res.ok) return {}
     const body = await res.json().catch(() => ({}))
     return (body.pricing ?? {}) as Record<string, TranscriptStatsModelPricing | null>
+  },
+
+  /** Recent thinking blocks for a session (tail-read from its
+   *  transcript). Returns null on any failure — the thinking card is
+   *  decoration, never worth an error toast. */
+  getSessionThinking: async (sessionId: string): Promise<ThinkingBroadcast | null> => {
+    try {
+      const res = await fetch(`${API_BASE}/sessions/${encodeURIComponent(sessionId)}/thinking`)
+      if (!res.ok) return null
+      const body = await res.json()
+      return {
+        sessionId: body.sessionId,
+        blocks: body.blocks ?? [],
+        total: body.total,
+      }
+    } catch {
+      return null
+    }
   },
 }
 
