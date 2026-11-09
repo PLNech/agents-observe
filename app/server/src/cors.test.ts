@@ -8,9 +8,17 @@ describe('isLoopbackOrigin', () => {
     expect(isLoopbackOrigin('http://[::1]:4981')).toBe(true)
   })
 
+  test('accepts *.localhost subdomains (named local dashboards, RFC 6761 loopback)', () => {
+    expect(isLoopbackOrigin('http://agents.localhost')).toBe(true)
+    expect(isLoopbackOrigin('http://agents.localhost:4981')).toBe(true)
+  })
+
   test('rejects non-loopback and malformed origins', () => {
     expect(isLoopbackOrigin('https://evil.com')).toBe(false)
     expect(isLoopbackOrigin('http://192.168.1.5:4981')).toBe(false)
+    // lookalike suffixes are not loopback — only the reserved .localhost tree
+    expect(isLoopbackOrigin('http://evil.localhost.com')).toBe(false)
+    expect(isLoopbackOrigin('http://localhost.evil.com')).toBe(false)
     expect(isLoopbackOrigin('')).toBe(false)
     expect(isLoopbackOrigin('not-a-url')).toBe(false)
   })

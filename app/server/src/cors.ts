@@ -9,7 +9,9 @@
 import type { Context } from 'hono'
 
 /**
- * True when `origin` is a loopback URL (localhost / 127.0.0.1 / ::1) on any
+ * True when `origin` is a loopback URL (localhost / 127.0.0.1 / ::1, or any
+ * `*.localhost` subdomain — RFC 6761 reserves that suffix to the loopback, so
+ * named local dashboards like `agents.localhost` count as loopback) on any
  * port. Malformed origins (including the empty string sent by non-browser
  * clients) return false.
  */
@@ -20,7 +22,8 @@ export function isLoopbackOrigin(origin: string): boolean {
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
       hostname === '::1' ||
-      hostname === '[::1]'
+      hostname === '[::1]' ||
+      hostname.endsWith('.localhost')
     )
   } catch {
     return false
