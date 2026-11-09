@@ -29,6 +29,7 @@ import {
   Copy,
 } from 'lucide-react'
 import { useProjects } from '@/hooks/use-projects'
+import { LeboardLinkSection } from './leboard-link'
 import type { Project, Session } from '@/types'
 
 interface ProjectModalProps {
@@ -275,6 +276,9 @@ export function ProjectModal({ project, open, onOpenChange }: ProjectModalProps)
               )}
             </div>
           )}
+
+          {/* LeBoard link: current mapping or fuzzy-match suggestion */}
+          <LeboardLinkSection project={project} open={open} />
 
           {/* Session list */}
           <div className="flex-1 min-h-0 overflow-y-auto border-t">

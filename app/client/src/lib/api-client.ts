@@ -9,6 +9,7 @@ import type {
   SessionFacets,
   Filter,
   ThinkingBroadcast,
+  LeboardSuggestions,
 } from '@/types'
 
 /**
@@ -162,6 +163,17 @@ export const api = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
+    }),
+  getLeboardSuggestions: () => fetchJson<LeboardSuggestions>(`/projects/leboard-suggestions`),
+  setProjectLeboard: (
+    projectId: number,
+    leboardProjectId: string | null,
+    leboardProjectName: string | null,
+  ) =>
+    fetchVoid(`/projects/${projectId}/leboard`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ leboardProjectId, leboardProjectName }),
     }),
   createProject: (data: { name: string; slug?: string }) =>
     fetchJson<Project>(`/projects`, {

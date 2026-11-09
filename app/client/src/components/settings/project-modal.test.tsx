@@ -32,6 +32,9 @@ vi.mock('@/lib/api-client', () => ({
     updateSessionSlug: mockUpdateSessionSlug,
     renameProject: vi.fn(() => Promise.resolve({ ok: true })),
     deleteProject: vi.fn(() => Promise.resolve({ ok: true })),
+    getLeboardSuggestions: () =>
+      Promise.resolve({ available: false, projects: [], suggestions: [] }),
+    setProjectLeboard: vi.fn(() => Promise.resolve({ ok: true })),
   },
 }))
 

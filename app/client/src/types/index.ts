@@ -2,8 +2,35 @@ export interface Project {
   id: number
   slug: string
   name: string
+  /** LeBoard project this dashboard project is linked to (name-keyed), or null. */
+  leboardProjectId?: string | null
+  /** Name snapshot kept for display when LeBoard is unreachable. */
+  leboardProjectName?: string | null
   createdAt: number
   sessionCount?: number
+}
+
+/** One fuzzy match from GET /projects/leboard-suggestions. */
+export interface LeboardMatch {
+  leboardId: string
+  leboardName: string
+  /** 0..1 similarity; >= 0.7 is flagged confident by the server. */
+  score: number
+  confident: boolean
+}
+
+export interface LeboardSuggestions {
+  /** false when the local LeBoard app is unreachable. */
+  available: boolean
+  /** Full LeBoard project list (id = name) for the "pick from list" picker. */
+  projects: { id: string; name: string }[]
+  suggestions: {
+    projectId: number
+    projectName: string
+    projectSlug: string
+    best: LeboardMatch | null
+    runnerUp: LeboardMatch | null
+  }[]
 }
 
 export interface Label {
