@@ -148,3 +148,10 @@ export function broadcastToAll(message: object): void {
 export function getClientCount(): number {
   return allClients.size
 }
+
+/** Distinct session ids with at least one subscribed client. Used by
+ *  the thinking-broadcast tick to poll only transcripts somebody is
+ *  actually watching. */
+export function getSubscribedSessions(): Set<string> {
+  return new Set(clientSessions.values())
+}

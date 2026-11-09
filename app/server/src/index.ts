@@ -3,12 +3,21 @@ import type { Server } from 'http'
 import { serve } from '@hono/node-server'
 import { createApp } from './app'
 import { createStore } from './storage'
-import { attachWebSocket, broadcastToSession, broadcastToAll, broadcastActivity } from './websocket'
+import {
+  attachWebSocket,
+  broadcastToSession,
+  broadcastToAll,
+  broadcastActivity,
+  getSubscribedSessions,
+} from './websocket'
 import { config } from './config'
 import { startConsumerSweep } from './consumer-tracker'
+import { startThinkingBroadcast } from './services/thinking-broadcast'
 
 const store = createStore()
 const PORT = config.port
+// Set once the server binds; noop before that (nothing to stop).
+let stopThinkingBroadcast: () => void = () => {}
 
 // Repair any rows with broken foreign keys before serving traffic.
 // Logs what it found so the user knows if state was unexpected.
@@ -49,6 +58,7 @@ function start(retries = 3) {
 
   attachWebSocket(server as unknown as Server)
   startConsumerSweep()
+  stopThinkingBroadcast = startThinkingBroadcast(store, getSubscribedSessions, broadcastToSession)
 }
 
 start()
