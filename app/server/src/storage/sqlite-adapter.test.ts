@@ -1000,6 +1000,70 @@ describe('SqliteAdapter — getRecentSessions', () => {
 })
 
 // ---------------------------------------------------------------------------
+// getSessionFacets
+// ---------------------------------------------------------------------------
+describe('SqliteAdapter — getSessionFacets', () => {
+  test('aggregates tool categories, failures, denials and subagent events per session', async () => {
+    const projId = await store.createProject('proj1', 'Project 1')
+    await store.upsertSession('sess1', projId, null, null, 1000)
+    await store.upsertAgent('a1', 'sess1', null, null, null)
+
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1000, payload: { tool_name: 'Bash' } })
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1001, payload: { tool_name: 'Bash' } })
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1002, payload: { tool_name: 'mcp__rea__analyze_function' } })
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1003, payload: { tool_name: 'SomeFutureTool' } })
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUseFailure', timestamp: 1004 })
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PermissionDenied', timestamp: 1005 })
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'SubagentStart', timestamp: 1006 })
+    // Not part of the facet scan:
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'UserPromptSubmit', timestamp: 1007 })
+
+    const facets = await store.getSessionFacets()
+    expect(facets.sessions['sess1']).toEqual({
+      toolCategories: { shell: 2, mcp: 1, other: 1 },
+      toolFailures: 1,
+      permissionDenied: 1,
+      subagentEvents: 1,
+    })
+    expect(facets.categorySessionCounts).toEqual({ shell: 1, mcp: 1, other: 1 })
+  })
+
+  test('counts the tool mix from PostToolUse only (no PreToolUse double-count)', async () => {
+    const projId = await store.createProject('proj1', 'Project 1')
+    await store.upsertSession('sess1', projId, null, null, 1000)
+    await store.upsertAgent('a1', 'sess1', null, null, null)
+
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PreToolUse', timestamp: 1000, payload: { tool_name: 'Edit' } })
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1001, payload: { tool_name: 'Edit' } })
+
+    const facets = await store.getSessionFacets()
+    expect(facets.sessions['sess1'].toolCategories).toEqual({ edit: 1 })
+  })
+
+  test('omits sessions with no facet-relevant events and leaves counts empty', async () => {
+    const projId = await store.createProject('proj1', 'Project 1')
+    await store.upsertSession('sess1', projId, null, null, 1000)
+    await store.upsertAgent('a1', 'sess1', null, null, null)
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'UserPromptSubmit', timestamp: 1000 })
+
+    const facets = await store.getSessionFacets()
+    expect(facets.sessions).toEqual({})
+    expect(facets.categorySessionCounts).toEqual({})
+  })
+
+  test('handles a null tool_name payload without crashing', async () => {
+    const projId = await store.createProject('proj1', 'Project 1')
+    await store.upsertSession('sess1', projId, null, null, 1000)
+    await store.upsertAgent('a1', 'sess1', null, null, null)
+
+    await insertHookEvent({ agentId: 'a1', sessionId: 'sess1', hookName: 'PostToolUse', timestamp: 1000, payload: {} })
+
+    const facets = await store.getSessionFacets()
+    expect(facets.sessions['sess1'].toolCategories).toEqual({ other: 1 })
+  })
+})
+
+// ---------------------------------------------------------------------------
 // getUnassignedSessions
 // ---------------------------------------------------------------------------
 describe('SqliteAdapter — getUnassignedSessions', () => {

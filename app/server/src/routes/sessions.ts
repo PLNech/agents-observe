@@ -67,6 +67,14 @@ router.get('/sessions/unassigned', async (c) => {
   return c.json(rows.map(rowToRecentSession))
 })
 
+// GET /sessions/facets — per-session tool-category mix + error counts for
+// the sessions-list facet bar. Computed query-time over the events table
+// (see EventStore.getSessionFacets for the runtime-vs-batch rationale).
+router.get('/sessions/facets', async (c) => {
+  const store = c.get('store')
+  return c.json(await store.getSessionFacets())
+})
+
 // GET /sessions/:id
 router.get('/sessions/:id', async (c) => {
   const store = c.get('store')

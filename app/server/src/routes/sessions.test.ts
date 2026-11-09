@@ -143,6 +143,54 @@ describe('session routes — agentClasses response shape', () => {
   })
 })
 
+describe('GET /api/sessions/facets', () => {
+  let app: Hono<Env>
+  const mockStore = {
+    getSessionFacets: vi.fn(),
+    getSessionById: vi.fn(),
+  }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    Object.values(mockStore).forEach((fn) => fn.mockReset())
+
+    vi.doMock('../config', () => ({
+      config: { logLevel: 'error' },
+    }))
+
+    const { default: sessionsRouter } = await import('./sessions')
+    app = new Hono<Env>()
+    app.use('*', async (c, next) => {
+      c.set('store', mockStore as unknown as EventStore)
+      c.set('broadcastToSession', () => {})
+      c.set('broadcastToAll', () => {})
+      await next()
+    })
+    app.route('/api', sessionsRouter)
+  })
+
+  test('returns the store facets payload as-is', async () => {
+    const facets = {
+      sessions: {
+        sess1: { toolCategories: { shell: 3, edit: 1 }, toolFailures: 1, permissionDenied: 0, subagentEvents: 2 },
+      },
+      categorySessionCounts: { shell: 1, edit: 1 },
+    }
+    mockStore.getSessionFacets.mockResolvedValue(facets)
+
+    const res = await app.request('/api/sessions/facets')
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual(facets)
+  })
+
+  test('static /facets path wins over the /:id param route', async () => {
+    mockStore.getSessionById.mockResolvedValue({ id: 'facets' })
+    await app.request('/api/sessions/facets')
+    expect(mockStore.getSessionById).not.toHaveBeenCalled()
+    expect(mockStore.getSessionFacets).toHaveBeenCalled()
+  })
+})
+
 describe('GET /api/sessions/:id/events — fields= allow-list', () => {
   let app: Hono<Env>
   const mockStore = {

@@ -145,6 +145,13 @@ export interface EventStore {
    *  unless `flags.resolveProject` or `_meta.project.slug` is set, so
    *  these are genuinely user-actionable. */
   getUnassignedSessions(limit?: number): Promise<any[]>
+  /**
+   * Per-session tool-category mix + error counts for the dashboard facet
+   * bar (GET /sessions/facets). Query-time by design (runtime-vs-batch
+   * doctrine): a single events scan aggregated in TypeScript, a few ms at
+   * ~30k events. Materialize a rollup table only past ~1M events.
+   */
+  getSessionFacets(): Promise<SessionFacets>
   healthCheck(): Promise<{ ok: boolean; error?: string }>
   /**
    * Scan all tables for rows with broken foreign keys and repair them.
@@ -181,6 +188,25 @@ export interface EventStore {
   resetDefaultFilters(): Promise<Filter[]>
   /** Idempotent. Inserts missing defaults; updates name/pill_name/display/combinator/patterns of existing rows; never touches enabled. */
   seedDefaultFilters(): Promise<void>
+}
+
+/** Facet aggregates for a single session (see EventStore.getSessionFacets). */
+export interface SessionFacetRow {
+  /** Tool-name category → event count (PostToolUse only, see toolCategory). */
+  toolCategories: Record<string, number>
+  /** PostToolUseFailure events. */
+  toolFailures: number
+  /** PermissionDenied events. */
+  permissionDenied: number
+  /** SubagentStart events. */
+  subagentEvents: number
+}
+
+export interface SessionFacets {
+  /** Per-session facet rows. Sessions with no tool/error events are absent. */
+  sessions: Record<string, SessionFacetRow>
+  /** How many sessions used each tool category. */
+  categorySessionCounts: Record<string, number>
 }
 
 export interface OrphanRepairResult {

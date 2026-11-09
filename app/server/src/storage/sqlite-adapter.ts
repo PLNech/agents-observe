@@ -16,8 +16,11 @@ import type {
   EventFilters,
   StoredEvent,
   OrphanRepairResult,
+  SessionFacets,
+  SessionFacetRow,
 } from './types'
 import { DuplicateEventSignatureError } from './types'
+import { toolCategory } from '../utils/tool-categories'
 import type { Filter, FilterRow, FilterPattern } from '../types'
 import { randomUUID } from 'node:crypto'
 import { SEED_FILTERS } from './seed-filters'
@@ -1426,6 +1429,57 @@ export class SqliteAdapter implements EventStore {
     `,
       )
       .all(limit)
+  }
+
+  async getSessionFacets(): Promise<SessionFacets> {
+    // Query-time by design (runtime-vs-batch doctrine): one events scan
+    // aggregated in TypeScript — a few ms at ~30k events. Materialize a
+    // rollup table only past ~1M events.
+    //
+    // The tool mix reads PostToolUse only. PreToolUse fires for every call
+    // attempt, including ones later denied or failed, so folding both hooks
+    // into the mix would double-count tools that never actually ran;
+    // failures and denials keep their dedicated counters below.
+    const rows = this.db
+      .prepare(
+        `
+      SELECT session_id,
+        hook_name,
+        json_extract(payload, '$.tool_name') AS tool_name
+      FROM events
+      WHERE hook_name IN ('PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'PermissionDenied', 'SubagentStart')
+    `,
+      )
+      .all() as { session_id: string; hook_name: string; tool_name: string | null }[]
+
+    const sessions: Record<string, SessionFacetRow> = {}
+    for (const row of rows) {
+      let facet = sessions[row.session_id]
+      if (!facet) {
+        facet = { toolCategories: {}, toolFailures: 0, permissionDenied: 0, subagentEvents: 0 }
+        sessions[row.session_id] = facet
+      }
+
+      if (row.hook_name === 'PostToolUse') {
+        const category = toolCategory(row.tool_name)
+        facet.toolCategories[category] = (facet.toolCategories[category] ?? 0) + 1
+      } else if (row.hook_name === 'PostToolUseFailure') {
+        facet.toolFailures++
+      } else if (row.hook_name === 'PermissionDenied') {
+        facet.permissionDenied++
+      } else if (row.hook_name === 'SubagentStart') {
+        facet.subagentEvents++
+      }
+    }
+
+    const categorySessionCounts: Record<string, number> = {}
+    for (const facet of Object.values(sessions)) {
+      for (const category of Object.keys(facet.toolCategories)) {
+        categorySessionCounts[category] = (categorySessionCounts[category] ?? 0) + 1
+      }
+    }
+
+    return { sessions, categorySessionCounts }
   }
 
   async repairOrphans(): Promise<OrphanRepairResult> {
